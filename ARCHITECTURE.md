@@ -4,7 +4,50 @@ Ce document détaille de manière approfondie l'architecture, les flux de donné
 
 ---
 
-## 🗺️ 1. Architecture Globale & Data Mesh
+## 🏛️ 1. Paradigmes d'Architecture Adoptés (Pourquoi & Comment)
+
+Notre plateforme combine intelligemment plusieurs architectures modernes majeures afin de résoudre différents défis techniques et métiers de manière optimale.
+
+### A. Les 5 Paradigmes Utilisés dans le Projet
+
+#### 1. Architecture Kappa (Streaming Layer)
+- **Pourquoi ce choix ?** Pour le stock en temps réel et la détection immédiate de fraude. Attendre un traitement batch quotidien pour ces opérations critique de vente en ligne introduirait une latence inacceptable (survente ou fraudes bancaires répétées).
+- **Comment ça fonctionne ?** Kafka sert de buffer d'ingestion central à haut débit. Apache Flink consomme directement ces flux en continu, exécute les calculs analytiques à la volée (fenêtres temporelles glissantes) et envoie des alertes ou deductions instantanées via ses Sinks (Slack, console) en moins de 2 secondes.
+
+#### 2. Architecture Lambda (Serving & ML Layer)
+- **Pourquoi ce choix ?** Pour le moteur de recommandation de produits. Les prédictions basées purement sur le temps réel manquent de recul historique (profil utilisateur global), tandis que les prédictions purement batch ne s'adaptent pas à la navigation active du client en cours.
+- **Comment ça fonctionne ?** 
+  - **Batch Layer (Chemin lent/précis)** : PySpark entraîne de manière hebdomadaire un modèle de filtrage collaboratif ALS sur les données historiques exhaustives consolidées dans Snowflake, puis enregistre le modèle dans le registre MLflow.
+  - **Speed Layer (Chemin rapide/approximatif)** : Les clics de navigation de la session en cours sont ingérés par Kafka.
+  - **Serving Layer (FastAPI)** : L'API FastAPI charge le modèle MLflow actif et fusionne à la volée les caractéristiques batch (profil historique) et les interactions en direct (session en cours) pour servir des recommandations hautement personnalisées.
+
+#### 3. Data Lakehouse (Medallion Architecture)
+- **Pourquoi ce choix ?** Stocker des pétaoctets de logs bruts directement dans un data warehouse coûte extrêmement cher. Le Lakehouse combine le prix très bas et la flexibilité d'un Data Lake (AWS S3) avec les transactions ACID et la fiabilité d'un Data Warehouse (Delta Lake).
+- **Comment ça fonctionne ?** Les données brutes atterrissent d'abord dans la zone **Raw** de S3. PySpark structure ces données en Delta Lake de manière incrémentale à travers les couches **Bronze** (données brutes partitionnées) et **Silver** (nettoyées, typées et dédupliquées).
+
+#### 4. Modern ELT (dbt + Snowflake + Airflow)
+- **Pourquoi ce choix ?** Pour l'analyse décisionnelle (BI). SQL est le langage standard, et Snowflake offre une puissance de calcul SQL élastique incomparable pour requêter des milliards de lignes en secondes. dbt permet d'appliquer les pratiques logicielles (tests, modularité) aux transformations de données.
+- **Comment ça fonctionne ?** Les données fiables de la zone **Silver** de S3 sont chargées dans Snowflake. dbt prend ensuite le relais dans le warehouse pour compiler et exécuter les transformations SQL déclaratives (Bronze $\rightarrow$ Silver $\rightarrow$ Gold / Marts), le tout orchestré quotidiennement par les DAGs Airflow.
+
+#### 5. Data Mesh (Organisation décentralisée)
+- **Pourquoi ce choix ?** Éviter que l'équipe data centrale ne devienne un goulot d'étranglement organisationnel au fur et à mesure que l'entreprise grandit.
+- **Comment ça fonctionne ?** Les responsabilités sont réparties par domaines métiers. L'équipe Commandes publie son Data Product (`mart_orders`), l'équipe Finance gère ses rapports de revenus (`mart_revenue`), et le Marketing gère les campagnes (`mart_campaigns`). Chaque produit dispose d'un contrat de données strict (`orders_contract.yml`), validé automatiquement à chaque run par Great Expectations, et exposé dans le catalogue centralisé DataHub.
+
+---
+
+### 🛢️ B. Rôle Distribué : Data Lake (S3) vs Data Warehouse (Snowflake)
+
+| Critère | Data Lake (AWS S3) | Data Warehouse (Snowflake) |
+| :--- | :--- | :--- |
+| **Objectif Principal** | Stockage universel brut et immuable + features ML. | Moteur analytique SQL haute performance et gouvernance d'entreprise. |
+| **Structure des Données**| Schema-on-Read (JSON brut, Parquet, Delta Lake, logs, images). | Schema-on-Write (Tables relationnelles hautement indexées et optimisées). |
+| **Coût** | Très économique (stockage objet standard). | Modéré à élevé (facturation élastique au calcul + stockage cloud). |
+| **Utilisateurs Cibles** | Data Engineers (ingestion), Data Scientists (modèles ML). | Data Analysts, Business Intelligence (BI), équipes Finance & Marketing. |
+| **Paradigme de Calcul** | Traitements batch distribués de masse (PySpark). | Transformations SQL dbt (ELT) & requêtes décisionnelles rapides. |
+
+---
+
+## 🗺️ 2. Architecture Globale & Data Mesh
 
 La plateforme intègre deux grands paradigmes d'architecture :
 1. **L'architecture Lambda & Kappa** : Coexistence du streaming en temps réel (Kappa) pour la réactivité critique et du traitement batch (Medallion) pour les analyses historiques exhaustives et l'entraînement ML.
@@ -65,7 +108,7 @@ graph TD
 
 ---
 
-## 🔄 2. Les Flux de Données (Data Flows)
+## 🔄 3. Les Flux de Données (Data Flows)
 
 ### A. Le flux Streaming Temps Réel (Kappa)
 - **Ingestion** : Les clics et ajouts au panier du site e-commerce sont poussés en continu dans le topic Kafka `web_events` sous format binaire Avro pour des raisons d'efficacité de stockage et de contrôle de schéma.
@@ -85,7 +128,7 @@ graph TD
 
 ---
 
-## 🧮 3. Formules Mathématiques & Algorithmes
+## 🧮 4. Formules Mathématiques & Algorithmes
 
 ### A. Système de Recommandation : Alternating Least Squares (ALS)
 Le module ML (`ml/training/train_recommender.py`) implémente la factorisation de matrice collaborative ALS (Alternating Least Squares) pour prédire l'affinité d'un utilisateur $u$ pour un produit $i$.
@@ -135,7 +178,7 @@ Une alerte critique est déclenchée immédiatement si $|Z| > 3.0$ (déviation d
 
 ---
 
-## 🚨 4. Gestion des Erreurs (Error Handling)
+## 🚨 5. Gestion des Erreurs (Error Handling)
 
 Une plateforme de production doit être hautement résiliente. Nous séparons les stratégies de résolution selon le type d'erreur.
 
@@ -168,7 +211,7 @@ Si les comportements d'achat des clients changent brutalement (ex: période de s
 
 ---
 
-## 📂 5. Cartographie des Fichiers & Lignage Applicatif (Inputs / Processing / Outputs)
+## 📂 6. Cartographie des Fichiers & Lignage Applicatif (Inputs / Processing / Outputs)
 
 Voici la cartographie exhaustive des fichiers clés du projet, décrivant pour chacun : ce qu'il reçoit (Source), comment il le traite, et vers qui il l'envoie (Sink).
 
