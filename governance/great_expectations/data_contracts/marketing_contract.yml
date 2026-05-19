@@ -1,0 +1,11 @@
+# Data Mesh Contract: marketing_domain definition
+dataset: "user_conversions"
+domain: "marketing"
+owner: "marketing_growth@ecommerce.com"
+sla:
+  latency: "daily"
+schema:
+  - name: "user_id"
+    type: "varchar"
+  - name: "total_purchases"
+    type: "integer"

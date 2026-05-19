@@ -1,0 +1,19 @@
+name: daily_orders_checkpoint
+config_version: 1.0
+class_name: Checkpoint
+validations:
+  - batch_request:
+      datasource_name: ecommerce_s3_lakehouse
+      data_connector_name: default_inferred_data_connector_name
+      data_asset_name: silver_orders
+    expectation_suite_name: orders_suite
+action_list:
+  - name: store_validation_result
+    action:
+      class_name: StoreValidationResultAction
+  - name: store_evaluation_params
+    action:
+      class_name: StoreEvaluationParametersAction
+  - name: update_data_docs
+    action:
+      class_name: UpdateDataDocsAction

@@ -1,0 +1,23 @@
+name: Deploy Serving API to Production
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ml/serving/api/**'
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build Docker API Serving Image
+        run: |
+          docker build -t ecom-recommender-api:latest -f ml/serving/api/Dockerfile ml/serving/api/
+
+      # In a real environment, steps would follow to login to AWS ECR/GCR and push the Docker Image
+      - name: Mock Image Registry Push
+        run: |
+          echo "Simulated push to Amazon ECR"

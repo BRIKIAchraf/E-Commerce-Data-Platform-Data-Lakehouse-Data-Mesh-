@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: mart_orders
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: user_id
+        tests:
+          - not_null

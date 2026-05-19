@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: internal_raw
+    database: ECOMMERCE_DB
+    schema: STAGING
+    tables:
+      - name: raw_web_events
+        description: "Raw tracking user behavior clicks and checkout actions"
+      - name: raw_orders
+        description: "E-Commerce order records injected via Flink or CDC"
+      - name: raw_stripe_payments
+        description: "Stripe payments records ingested daily via Airbyte"

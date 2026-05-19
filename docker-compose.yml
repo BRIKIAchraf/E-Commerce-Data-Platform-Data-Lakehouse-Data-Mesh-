@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # --- INGESTION & DATA STREAMING (KAPPA) ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.4.0
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+
+  # Debezium CDC Source Database
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: orderdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  debezium:
+    image: debezium/connect:2.3
+    container_name: debezium
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+      KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+  # --- STREAMING ENGINE (FLINK) ---
+  flink-jobmanager:
+    image: flink:1.17-scala_2.12
+    container_name: flink-jobmanager
+    ports:
+      - "8082:8081"
+    command: jobmanager
+    environment:
+      - |
+        JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+
+  flink-taskmanager:
+    image: flink:1.17-scala_2.12
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - |
+        JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+
+  # --- BATCH ENGINE (SPARK) ---
+  spark-master:
+    image: bitnami/spark:3.4.1
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+
+  spark-worker:
+    image: bitnami/spark:3.4.1
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    ports:
+      - "8084:8081"
+
+  # --- ORCHESTRATION (AIRFLOW) ---
+  airflow-webserver:
+    image: apache/airflow:2.7.1-python3.10
+    container_name: airflow-webserver
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=False
+      - EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgrespassword@postgres:5432/airflowdb
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./orchestration/dags:/opt/airflow/dags
+      - ./orchestration/plugins:/opt/airflow/plugins
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1-python3.10
+    container_name: airflow-scheduler
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=False
+      - EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgrespassword@postgres:5432/airflowdb
+    volumes:
+      - ./orchestration/dags:/opt/airflow/dags
+      - ./orchestration/plugins:/opt/airflow/plugins
+
+  # --- MACHINE LEARNING (MLFLOW) ---
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.7.1
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://my-mlflow-artifacts-bucket/
+
+  # --- GOVERNANCE (DATAHUB) ---
+  datahub-gms:
+    image: acryldata/datahub-gms:v0.12.0
+    container_name: datahub-gms
+    ports:
+      - "8080:8080"
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+  
+  datahub-frontend:
+    image: acryldata/datahub-frontend-react:v0.12.0
+    container_name: datahub-frontend
+    ports:
+      - "9002:9002"
+    depends_on:
+      - datahub-gms
+
+  # --- VISUALIZATION (METABASE) ---
+  metabase:
+    image: metabase/metabase:v0.46.6
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase-data:/metabase-data
+
+  # --- OBSERVABILITY ---
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  pgdata:
+  metabase-data:

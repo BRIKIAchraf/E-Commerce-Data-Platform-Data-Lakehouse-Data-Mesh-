@@ -1,0 +1,24 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Kafka Consumer Group Lag",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "title": "Kafka Real-Time Lag Monitor",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["kafka", "streaming"],
+  "version": 1
+}

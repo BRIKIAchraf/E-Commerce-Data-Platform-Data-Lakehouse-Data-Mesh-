@@ -1,0 +1,38 @@
+{
+  "sourceId": "salesforce-source-uuid-12345",
+  "destinationId": "s3-destination-uuid-12345",
+  "namespaceDefinition": "destination",
+  "prefix": "salesforce_",
+  "syncCatalog": {
+    "streams": [
+      {
+        "stream": {
+          "name": "accounts",
+          "jsonSchema": {},
+          "supportedSyncModes": ["incremental"]
+        },
+        "config": {
+          "syncMode": "incremental",
+          "cursorField": ["SystemModstamp"],
+          "destinationSyncMode": "append"
+        }
+      },
+      {
+        "stream": {
+          "name": "opportunities",
+          "jsonSchema": {},
+          "supportedSyncModes": ["incremental"]
+        },
+        "config": {
+          "syncMode": "incremental",
+          "cursorField": ["SystemModstamp"],
+          "destinationSyncMode": "append"
+        }
+      }
+    ]
+  },
+  "schedule": {
+    "units": 1,
+    "timeUnit": "days"
+  }
+}

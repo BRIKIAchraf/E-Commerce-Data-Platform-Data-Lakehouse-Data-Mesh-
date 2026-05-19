@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "WebEvent",
+  "namespace": "com.ecommerce.web",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "session_id", "type": "string"},
+    {"name": "user_id", "type": ["null", "string"], "default": null},
+    {"name": "event_type", "type": "string"},
+    {"name": "product_id", "type": ["null", "string"], "default": null},
+    {"name": "category", "type": ["null", "string"], "default": null},
+    {"name": "timestamp", "type": "long"},
+    {"name": "ip_address", "type": "string"},
+    {"name": "device_type", "type": "string"}
+  ]
+}

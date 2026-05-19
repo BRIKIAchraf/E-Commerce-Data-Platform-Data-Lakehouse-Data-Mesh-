@@ -1,0 +1,8 @@
+version: 2
+
+models:
+  - name: mart_orders
+    columns:
+      - name: order_id
+        tests:
+          - unique

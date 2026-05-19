@@ -1,0 +1,15 @@
+# Data Mesh Contract: finance_domain definition
+dataset: "net_revenue"
+domain: "finance"
+owner: "finance_analysts@ecommerce.com"
+sla:
+  latency: "daily"
+  freshness_hours: 30
+schema:
+  - name: "revenue_date"
+    type: "date"
+    constraints:
+      - not_null
+  - name: "net_revenue"
+    type: "double"
+    description: "Verified income excluding taxes and refunds"

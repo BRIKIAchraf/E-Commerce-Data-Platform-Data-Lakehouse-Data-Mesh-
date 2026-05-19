@@ -1,0 +1,19 @@
+kafka:
+  bootstrap.servers: "localhost:9092"
+  registry.url: "http://localhost:8081"
+  topics:
+    - name: "web_events"
+      partitions: 6
+      replication_factor: 3
+      cleanup_policy: "delete"
+      retention_ms: 604800000 # 7 days
+    - name: "orders_cdc"
+      partitions: 3
+      replication_factor: 3
+      cleanup_policy: "compact"
+      retention_ms: -1 # Infinite retention
+    - name: "fraud_alerts"
+      partitions: 2
+      replication_factor: 3
+      cleanup_policy: "delete"
+      retention_ms: 259200000 # 3 days

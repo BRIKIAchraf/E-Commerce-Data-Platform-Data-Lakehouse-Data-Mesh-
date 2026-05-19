@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "Order",
+  "namespace": "com.ecommerce.orders",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "user_id", "type": "string"},
+    {"name": "total_amount", "type": "double"},
+    {"name": "status", "type": "string"},
+    {"name": "payment_method", "type": "string"},
+    {"name": "shipping_address", "type": "string"},
+    {"name": "created_at", "type": "long"},
+    {"name": "updated_at", "type": "long"}
+  ]
+}

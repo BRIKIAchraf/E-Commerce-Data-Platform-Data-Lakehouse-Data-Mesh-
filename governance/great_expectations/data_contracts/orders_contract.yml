@@ -1,0 +1,22 @@
+# Data Mesh Contract: orders_domain definition
+dataset: "orders"
+domain: "orders"
+owner: "orders_team@ecommerce.com"
+sla:
+  latency: "daily"
+  freshness_hours: 26
+schema:
+  - name: "order_id"
+    type: "varchar"
+    description: "Unique order identifier"
+    constraints:
+      - not_null
+      - unique
+  - name: "user_id"
+    type: "varchar"
+    description: "Referential customer key"
+    constraints:
+      - not_null
+  - name: "total_amount"
+    type: "double"
+    description: "Sum paid by customer in euros"

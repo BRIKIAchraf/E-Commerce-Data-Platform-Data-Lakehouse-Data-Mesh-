@@ -1,0 +1,30 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "Airflow DAG Success Rate",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["airflow", "monitoring"],
+  "title": "Airflow Scheduler Health Dashboard",
+  "version": 1
+}

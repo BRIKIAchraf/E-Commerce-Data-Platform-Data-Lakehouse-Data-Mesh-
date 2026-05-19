@@ -1,0 +1,19 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "revenue_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "revenue_date"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "net_revenue",
+        "min_value": 0.0
+      }
+    }
+  ]
+}
