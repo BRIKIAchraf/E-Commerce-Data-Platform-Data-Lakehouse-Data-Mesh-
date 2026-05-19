@@ -165,3 +165,78 @@ Dans les environnements distribués, les pannes réseau peuvent provoquer le ren
 #### 3. Déviation de Données (Data Drift)
 Si les comportements d'achat des clients changent brutalement (ex: période de soldes ou Black Friday), les performances du modèle ML ALS peuvent décliner.
 - **Solution** : **Great Expectations** valide quotidiennement la distribution du panier moyen (`total_amount`). Si la déviation statistique sort de la plage définie (contrats de données définissant un max de 100k€ par commande), une alerte de qualité de données est déclenchée, ce qui notifie immédiatement les Data Scientists pour relancer un entraînement ML supervisé.
+
+---
+
+## 📂 5. Cartographie des Fichiers & Lignage Applicatif (Inputs / Processing / Outputs)
+
+Voici la cartographie exhaustive des fichiers clés du projet, décrivant pour chacun : ce qu'il reçoit (Source), comment il le traite, et vers qui il l'envoie (Sink).
+
+### A. Ingestion (ingestion/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `web_events_producer.py` | Interactions utilisateurs (clics, recherches, ajouts panier simulés). | Génère des payloads JSON nominaux et les sérialise au format binaire Avro. | Topic Kafka `web_events` (via Schema Registry). |
+| `orders_producer.py` | Événements d'achats et de commandes simulés. | Génère des transactions typées et les sérialise en Avro. | Topic Kafka `orders_cdc`. |
+| `postgres-connector.json` | Tables `orders` et `order_items` de la DB PostgreSQL. | Capture de données de changement (CDC) en continu. | Kafka Connect / Topics CDC. |
+| `stripe_to_s3.json` | API SaaS Stripe (Données financières). | Extraction quotidienne incrémentale. | S3 Zone Raw: `stripe/charges/` |
+| `salesforce_to_s3.json` | API SaaS Salesforce (Opportunités, Comptes). | Extraction incrémentale d'activités CRM. | S3 Zone Raw: `salesforce/accounts/` |
+
+### B. Streaming (streaming/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `fraud_detection.py` | Topic Kafka `orders_cdc` | Analyse glissante temps réel; filtre les transactions > 1200€. | Topic Kafka `fraud_alerts` + Print Console / Slack. |
+| `stock_updater.py` | Topic Kafka `web_events` | Filtre les types d'événements `add_to_cart`. | Déductions de stock en direct envoyées au console / microservices. |
+| `session_metrics.py` | Topic Kafka `web_events` | Calcule les statistiques d'activité de session par type d'appareil. | Métriques aggrégées pour Grafana live dashboard. |
+| `s3_sink.py` | Flink Stream | Partitionnement temporel de flux de streaming. | S3 Zone Raw (fichiers Parquet persistés). |
+| `snowflake_sink.py` | Flink Stream | Ingestion en continu haute performance. | Tables Snowflake Staging brutes. |
+| `slack_alerter.py` | Flink Alerts Stream | Formate les alertes avec des niveaux de sévérité (Critical, High). | API Webhook Slack (Canal de monitoring des équipes). |
+
+### C. Batch & Lakehouse (batch/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `bronze_ingestion.py` | Fichiers S3 Zone Raw | Charge les JSON/Parquet bruts de manière incrémentale. | Delta Tables Bronze dans `s3://.../bronze/` |
+| `silver_cleaning.py` | Delta Tables Bronze | Déduplication (sur `order_id`), typage et normalisation de dates. | Delta Tables Silver dans `s3://.../silver/` |
+| `feature_engineering.py` | Delta Tables Silver | Agrégation utilisateur (RFM: Lifetime Value, AOV, Fréquence). | Répertoire ML Features dans `s3://.../ml/features/` |
+| `spark_session.py` | Configurations d'environnement | Factory configurant les connecteurs AWS S3 et le Delta Lake Engine. | Utilisé par l'ensemble des scripts PySpark. |
+
+### D. Transformations & Warehouse (warehouse/dbt/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `stg_web_events.sql` | Table brute Snowflake `raw_web_events` | Typage et conversion d'horodatages unix (ms) en Timestamp. | Vue de staging `stg_web_events`. |
+| `stg_orders.sql` | Table brute Snowflake `raw_orders` | Nettoyage de chaînes de caractères et renommage de champs. | Vue de staging `stg_orders`. |
+| `stg_payments.sql` | Table brute Snowflake `raw_stripe_payments` | Nettoyage des montants de transactions financières. | Vue de staging `stg_payments`. |
+| `int_orders_payments.sql`| Vues `stg_orders` et `stg_payments` | Jointure gauche (`LEFT JOIN`) sur `order_id` pour fusionner commandes + paiements. | Modèle éphémère (utilisé dans les requêtes de compilation). |
+| `mart_orders.sql` | Modèle intermédiaire `int_orders_payments` | Ajout d'indicateurs de confirmation de revenu (`is_revenue_confirmed`). | Table Gold `mart_orders` (Snowflake). |
+| `mart_revenue.sql` | Table `mart_orders` | Agrégation par jour (Volume, CA Brut, CA Net confirmé). | Table Gold `mart_revenue` pour la BI. |
+| `mart_campaigns.sql` | Vues `stg_web_events` et `stg_orders` | Jointure pour corréler les sessions de navigation et les conversions d'achat. | Table Gold `mart_campaigns` pour la BI marketing. |
+
+### E. Orchestration (orchestration/dags/)
+
+| Fichier | Déclencheur | Action / Traitement | Cible (Ce qu'il active) |
+| :--- | :--- | :--- | :--- |
+| `dag_ingestion_batch.py` | Quotidien (3h) | Orchestre l'extraction des données Stripe / Salesforce. | Connecteurs d'intégration Airbyte. |
+| `dag_lakehouse_pipeline.py` | Quotidien (2h) | Enchaîne l'ingestion brute, le nettoyage et le feature engineering. | Soumissions de jobs PySpark (Master Spark). |
+| `dag_dbt_warehouse.py` | Quotidien (4h) | Compile et exécute les requêtes de transformation SQL et lance les tests. | Modèles Snowflake (via dbt run/test). |
+| `dag_ml_training.py` | Hebdomadaire | Relance l'entraînement du modèle de recommandation collaborative. | Script PySpark ALS. |
+| `dag_quality_checks.py` | Quotidien | Lance les suites de tests de contrats de données Great Expectations. | Checkpoints Great Expectations (fichiers de rapports HTML). |
+
+### F. Serving & Machine Learning (ml/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `train_recommender.py` | Données de transactions Gold | Entraîne l'algorithme ALS Spark MLlib. | Enregistre le modèle dans le registre MLflow. |
+| `feature_store.py` | Répertoire ML Features sur S3 | Lecture optimisée des matrices de caractéristiques clients historiques. | Utilisé par les notebooks et scripts de prédiction. |
+| `main.py` (FastAPI) | Requête API de recommandation (HTTP POST). | Reçoit l'ID utilisateur, charge le modèle MLflow actif et interroge le prédiction Engine. | Payload JSON (Recommandations personnalisées au site web). |
+| `recommender.py` | Modèle MLflow + Topic Kafka | Combine les prédictions batch (historiques) et le comportement en direct (streaming). | Recommandations scorées et triées. |
+
+### G. Gouvernance & Qualité (governance/)
+
+| Fichier | Source (Reçoit) | Traitement (Traitement) | Sink (Envoie à) |
+| :--- | :--- | :--- | :--- |
+| `ingest_dbt.py` | Fichiers `manifest.json` et `catalog.json` | Extrait le graphe d'exécution dbt et la lignée de données. | API REST DataHub GMS (Catalogue de données). |
+| `ingest_airflow.py` | Fichiers DAG d'Airflow | Extrait la lignée d'exécution des tâches d'orchestration. | Catalogue DataHub. |
+| `orders_suite.json` | Table `silver_orders` | Exécute des tests de non-nullité, d'unicité et de valeurs limites. | Great Expectations HTML Data Docs. |
