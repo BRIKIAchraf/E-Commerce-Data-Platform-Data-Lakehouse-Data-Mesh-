@@ -1,0 +1,6 @@
+# Minimal headless CI dependencies for unit and API tests.
+pytest==7.3.1
+fastapi==0.95.2
+pydantic==1.10.13
+httpx==0.24.1
+pyspark==3.4.1
