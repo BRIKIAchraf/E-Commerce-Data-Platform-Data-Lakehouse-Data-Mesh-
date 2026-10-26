@@ -1,40 +1,73 @@
-# E-Commerce Data Platform (Data Lakehouse & Data Mesh)
+# E-Commerce Data Platform
 
-Bienvenue sur le dépôt de la plateforme Data E-Commerce. Ce projet fournit une architecture moderne intégrant le traitement en temps réel (Kappa via Flink) et le traitement batch (Lakehouse/ELT via Spark, dbt et Snowflake) avec des garanties fortes de gouvernance, qualité et suivi ML.
+Modern data platform reference architecture combining real-time streaming, batch lakehouse processing, ELT analytics, governance and ML serving.
 
-## 🛠️ Architecture Technologique
-* **Streaming (Kappa)** : Kafka $\\rightarrow$ Flink $\\rightarrow$ S3 & Snowflake
-* **Lakehouse (Batch)** : S3 (Delta Lake) $\\rightarrow$ PySpark $\\rightarrow$ Snowflake
-* **Transformation (ELT)** : dbt Core sur Snowflake (Bronze $\\rightarrow$ Silver $\\rightarrow$ Gold)
-* **Orchestration** : Apache Airflow
-* **Serving ML** : MLflow + FastAPI (Recommandations personnalisées)
-* **Gouvernance & Qualité** : DataHub (Lignée & Catalogue) + Great Expectations (Data Contracts)
-* **Monitoring** : Prometheus + Grafana + Metabase
+## Business objective
 
-## 📁 Structure du Projet
-Le dépôt est organisé de manière modulaire, reflétant chaque couche fonctionnelle :
-* `infra/` : Fichiers Terraform d'infrastructure as code et Dockerfiles.
-* `ingestion/` : Kafka Producers, schémas Avro et connecteurs Airbyte / Debezium CDC.
-* `data_lake/` : Emplacement logique des zones S3 Raw, Curated (Medallion) et ML features.
-* `streaming/` : Flink stream jobs et Sinks pour l'analyse en temps réel.
-* `batch/` : PySpark Jobs pour l'ingestion Bronze/Silver et le Feature Engineering.
-* `warehouse/` : Projet d'analyse d'entrepôt de données dbt (staging, intermediate, marts).
-* `orchestration/` : DAGs Airflow et opérateurs customisés.
-* `ml/` : Entraînement de recommandations via Spark MLlib et API FastAPI.
-* `governance/` : Scripts DataHub pour le lignage et suites Great Expectations.
-* `monitoring/` : Configuration de Prometheus et dashboards Grafana.
+Provide reliable product, order and customer datasets for operational monitoring, analytics and personalised recommendations.
 
-## 🚀 Démarrage Rapide
+## Architecture
 
-1. Instancier le Stack local :
-   ```bash
-   make up
-   ```
-2. Installer les dépendances Python localement :
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Lancer les tests unitaires :
-   ```bash
-   make test
-   ```
+~~~text
+Sources / CDC
+    ├─→ Kafka → Flink → S3 / Snowflake
+    └─→ Airbyte → S3
+              ↓
+        Delta Lake / PySpark
+              ↓
+     dbt Bronze → Silver → Gold
+              ↓
+        BI and ML features
+              ↓
+        MLflow + FastAPI
+~~~
+
+## Capabilities
+
+- Kappa-style real-time processing with Kafka and Flink;
+- batch processing and feature engineering with PySpark;
+- medallion data layers on S3/Delta Lake;
+- dbt transformations and analytical marts in Snowflake;
+- Airflow orchestration and repeatable workflows;
+- MLflow tracking and FastAPI serving for recommendation use cases;
+- DataHub lineage/catalogue and Great Expectations data contracts;
+- Prometheus, Grafana and Metabase monitoring.
+
+## Repository structure
+
+~~~text
+infra/            Terraform and container configuration
+ingestion/        Producers, Avro schemas, Airbyte and CDC connectors
+data_lake/        Raw, curated and ML feature zones
+streaming/        Flink jobs and sinks
+batch/            PySpark ingestion and feature engineering
+warehouse/        dbt staging, intermediate and marts
+orchestration/    Airflow DAGs and operators
+ml/               Recommendation training and API serving
+governance/       DataHub and Great Expectations
+monitoring/       Prometheus and Grafana
+~~~
+
+## Quick start
+
+Prerequisites: Docker, Docker Compose, Python and the project dependencies.
+
+~~~bash
+make up
+pip install -r requirements.txt
+make test
+~~~
+
+Commands depend on the services enabled in the local environment. Configure secrets through environment variables and never commit credentials.
+
+## Data contracts and quality
+
+The intended contract covers event identity, timestamps, order/customer keys, product attributes and recommendation features. Great Expectations is used to express checks before datasets are promoted between layers.
+
+## Status
+
+Architecture and repository blueprint for a data/ML platform. Validate every service integration and performance claim with reproducible tests before production use.
+
+## Author
+
+**Achraf BRIKI** · [LinkedIn](https://www.linkedin.com/in/achrafbriki/) · [Portfolio](https://achrafbriki.com)
