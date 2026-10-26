@@ -44,7 +44,13 @@ jobs:
         shell: bash
         run: |
           if find . -type f \( -name "test_*.py" -o -path "*/tests/*.py" \) -not -path "./.git/*" | grep -q .; then
-            if [ -f tests/test_spark_jobs.py ]; then\n              # Spark integration tests require a dedicated JVM/Spark runtime.\n              python -m pytest -q --ignore=tests/test_spark_jobs.py\n            else\n              python -m pytest -q\n            fi\n          else
+            if [ -f tests/test_spark_jobs.py ]; then
+              # Spark integration tests require a dedicated JVM/Spark runtime.
+              python -m pytest -q --ignore=tests/test_spark_jobs.py
+            else
+              python -m pytest -q
+            fi
+          else
             echo "No Python test files found; add tests as the project matures."
           fi
 
