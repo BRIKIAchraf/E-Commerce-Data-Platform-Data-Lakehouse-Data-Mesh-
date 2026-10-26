@@ -1,0 +1,12 @@
+{
+  "event_id": "order-demo-0001",
+  "event_type": "order.created",
+  "event_time": "2026-01-15T10:30:00Z",
+  "customer_id": "customer-demo-001",
+  "order_id": "order-demo-001",
+  "currency": "EUR",
+  "items": [
+    {"product_id": "sku-100", "quantity": 2, "unit_price": 29.90}
+  ],
+  "source": "synthetic-fixture"
+}
