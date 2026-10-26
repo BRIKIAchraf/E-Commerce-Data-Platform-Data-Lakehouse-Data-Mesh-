@@ -76,3 +76,12 @@ Architecture and repository blueprint for a data/ML platform. Validate every ser
 ## Author
 
 **Achraf BRIKI** · [LinkedIn](https://www.linkedin.com/in/achrafbriki/) · [Portfolio](https://achrafbriki.com)
+
+## Delivery profile
+
+**Status:** Blueprint  
+**Demo:** Local architecture walkthrough using the documented Make targets.  
+**Prerequisites:** Docker, Python, Java/Spark runtime and configured services.  
+**Validation:** Streaming/batch reconciliation, data contracts, dbt tests, feature freshness and lineage.  
+**Performance plan:** Measure Kafka/Flink throughput, Spark duration, dbt runtime, feature freshness and API latency.  
+**Roadmap:** Synthetic events, runnable CI, ML evaluation, AWS/Databricks deployment and cost benchmarks.
