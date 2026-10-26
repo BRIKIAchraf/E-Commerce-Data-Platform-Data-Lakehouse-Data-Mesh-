@@ -1,3 +1,8 @@
+
+
+## About
+
+Modern e-commerce data platform blueprint combining real-time streaming, batch lakehouse processing, ELT analytics, governance, data quality and ML serving.
 # E-Commerce Data Platform
 
 Modern data platform reference architecture combining real-time streaming, batch lakehouse processing, ELT analytics, governance and ML serving.
